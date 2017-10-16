@@ -1,72 +1,71 @@
 (ns cellular-automata.core
   (:gen-class)
-  (:use [clojure.pprint]))
+  (:use
+         [cellular-automata.cellularcore :as cellularcore]
+         [cellular-automata.swing.plotter :as p]
+        ))
 
-(defn lazy-dead-alive-seq [] (repeatedly #(if (= 0 (rand-int 2)) :dead :alive)))
+;; in here we want the core of the processes that take place
 
-(defn init-matrix [w h]
-  "this will create a matrix of height by width of random number"
-  (take h (repeatedly #(take w (lazy-dead-alive-seq)))))
+;; define our queue and a push and pop operation, pushes onto the back, pops off the front
 
-(defn move-rows-south [matrix w h]
-  "moves all the rows south, adding a row of dead cells to the top row"
-  (cons (repeat w :dead) (take (- h 1) matrix)))
+(def queue (ref clojure.lang.PersistentQueue/EMPTY)) ;; this is a queue that contains the states of the cellular-automata that we are to update to
 
-(defn move-rows-north [matrix w]
-  "moves all rows north, adding a row of dead cells to the bottom row"
-  (seq
-   (conj (vec (drop 1 matrix)) (repeat w :dead))))
+(def console-render (atom false)) ;; atom that will define if we are rendering to the console
+(def graphic-render (atom false)) ;; atom that will define if we are rendering graphically
 
-(defn move-row-west [row]
-  "moves a single row west, adding a dead cell to the end"
-  (seq
-   (conj (vec (drop 1 row)) :dead)))
+(defn push-onto-rear-queue!
+  "Will push a value of the matrix onto the back of the queue"
+  [item]
+  (dosync (alter queue conj item)))
 
-(defn move-row-east [row w]
-  "moves a single row east, adding a dead cell to the start"
-  (cons :dead (take (- w 1) row)))
+(defn pop-off-front-queue!
+  "Will pop a value of the front of the queue and return it"
+  []
+  (dosync
+   (let [v (peek @queue)]
+     (alter queue pop)
+     v)))
 
-(defn new-cell-value [current-cell-val surrounding-cells]
-  "takes the values of the surrounding cells and returns the values of the new cells, values are 1 for alive 0 for dead"
-  (let [alive-surrounding (count (filter #(= % :alive) surrounding-cells))]
-    (cond
-      (= current-cell-val :alive) (if (or (= alive-surrounding 2) (= alive-surrounding 3)) :alive :dead)
-      (= current-cell-val :dead) (if (= alive-surrounding 3) :alive :dead))
+;; process to generate a cellular automata
+(defn generate-cellular-automata
+  "a process that will generate cellular automata frames putting them onto the queue, control rate of animation by how fast we write
+  to the queue."
+  [width height refresh]
+  (do
+    (println "generating cellular automata")
+    (loop [w width h height matrix (cellularcore/init-matrix width height)]
+      (push-onto-rear-queue! matrix)
+      (Thread/sleep refresh)
+      (recur width height (cellularcore/new-matrix matrix width height))
+      )
     )
   )
 
-(defn new-row-value [current n s w]
-  "runs new-cell-value across a row."
-  (map
-   #(new-cell-value %1 (list %2 %3 %4 %5 %6 %7 %8 %9))
-   current
-   n
-   s
-   (move-row-east current w)
-   (move-row-west current)
-   (move-row-east n w)
-   (move-row-west n)
-   (move-row-east s w)
-   (move-row-west s)))
-
-(defn update-matrix [matrix w h]
-  "Update the matrix to the next epoch"
-  (map
-   #(new-row-value %1 %2 %3 w)
-   matrix
-   (move-rows-north matrix w)
-   (move-rows-south matrix w h)))
-
-(defn render-output! [matrix]
+;; a process to render into the console
+(defn render-matrix-in-console!
+  "render a matrix frame in the console"
+  [matrix]
   (doseq [l matrix]
     (println (map #(if (= % :dead) " " "*") l))))
+
+(defn render-in-console 
+  "a process that will pop matrices from the queue and render them in the console, will render as fast as frames are being written"
+  []
+  (while 
+      (loop []
+        (render-matrix-in-console! (pop-off-front-queue!))
+        (recur))))
 
 (defn -main [& args]
   " first arg is width, second arg is height"
   (do
-    (println "Enter width and height: ")
-    (loop [width (read-string (read-line)) height (read-string (read-line)) matrix (init-matrix width height)]
-      (println)
-      (render-output! matrix)
-      (Thread/sleep 100)
-      (recur width height (update-matrix matrix width height)))))
+    (println "Welcome to life")
+    (println "Enter width and height and refresh (ms): ")
+    (let [width (read-string (read-line)) height (read-string (read-line)) refresh (read-string (read-line))]
+      (future (generate-cellular-automata width height refresh))
+      (future (render-in-console))
+   ;;   (future (p/draw-frame))
+      )
+    )
+  )
