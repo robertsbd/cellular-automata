@@ -2,17 +2,20 @@
   (:gen-class)
   (:use
          [cellular-automata.cellularcore :as cellularcore]
-         [cellular-automata.swing.plotter :as p]
-        ))
-
-;; in here we want the core of the processes that take place
+         [seesaw.core :as sc]
+         [seesaw.graphics :as sg]
+         [seesaw.color :as scol]))
 
 ;; define our queue and a push and pop operation, pushes onto the back, pops off the front
 
 (def queue (ref clojure.lang.PersistentQueue/EMPTY)) ;; this is a queue that contains the states of the cellular-automata that we are to update to
 
-(def console-render (atom false)) ;; atom that will define if we are rendering to the console
-(def graphic-render (atom false)) ;; atom that will define if we are rendering graphically
+(def refresh 200)
+(def cols 160)
+(def rows 120)
+(def cell-width 6)
+(def dead-col :white)
+(def alive-col :blue)
 
 (defn push-onto-rear-queue!
   "Will push a value of the matrix onto the back of the queue"
@@ -27,7 +30,6 @@
      (alter queue pop)
      v)))
 
-;; process to generate a cellular automata
 (defn generate-cellular-automata
   "a process that will generate cellular automata frames putting them onto the queue, control rate of animation by how fast we write
   to the queue."
@@ -42,7 +44,6 @@
     )
   )
 
-;; a process to render into the console
 (defn render-matrix-in-console!
   "render a matrix frame in the console"
   [matrix]
@@ -57,15 +58,56 @@
         (render-matrix-in-console! (pop-off-front-queue!))
         (recur))))
 
-(defn -main [& args]
-  " first arg is width, second arg is height"
+;; here is all the graphical information
+
+(defn n []
+  (sc/native!))
+
+(defn paint-frame
+  "define the operation for painting the frame with an animation from 
+  from the queue"
+  [c g]
+  (let [matrix (pop-off-front-queue!)]
+    (doseq [m-row (map-indexed vector matrix)]
+      (doseq [m (map-indexed vector (second m-row))]
+        (sg/draw g
+                 (sg/rect (* (first m) (inc cell-width)) (* (first m-row) (inc cell-width)) cell-width cell-width)
+                 (sg/style :background (scol/color (if (= (second m) :alive) alive-col dead-col))))))))
+
+(def main-canvas
+  (sc/canvas :id :maincanvas
+          :background :white
+          :paint paint-frame))
+
+(def main-window
+  "renders in a swing frame"
+   (sc/frame :title "Cellular Automatat"
+             :content main-canvas))
+
+(defn create-window!
+  []
   (do
-    (println "Welcome to life")
-    (println "Enter width and height and refresh (ms): ")
-    (let [width (read-string (read-line)) height (read-string (read-line)) refresh (read-string (read-line))]
-      (future (generate-cellular-automata width height refresh))
-      (future (render-in-console))
-   ;;   (future (p/draw-frame))
-      )
-    )
-  )
+    (n)
+    (sc/show! main-window)
+    (sc/config! main-window :size [(* cols (inc cell-width)) :by (* rows (inc cell-width))])))
+
+(defn render-matrix-in-window!
+  []
+    (sc/repaint! (sc/select main-window [:#maincanvas])))
+
+(defn render-in-window
+  "a process that will pop matrices from the queue and render them in a swing 
+  window, will render as fast as frames are being written"
+  [refresh]
+  (do
+    (create-window!)
+    (while 
+        (loop []
+          (render-matrix-in-window!)
+          (Thread/sleep refresh)
+          (recur)))))
+
+(defn -main [& args]
+  (do
+    (future (generate-cellular-automata cols rows refresh))
+    (future (render-in-window refresh))))
