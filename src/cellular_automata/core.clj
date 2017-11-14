@@ -11,10 +11,10 @@
 (def queue (ref clojure.lang.PersistentQueue/EMPTY)) ;; this is a queue that contains the states of the cellular-automata that we are to update to
 
 (def refresh 200)
-(def cols 160)
-(def rows 120)
-(def cell-width 6)
-(def dead-col :white)
+(def cols 175)
+(def rows 105)
+(def cell-width 7)
+(def dead-col :yellow)
 (def alive-col :blue)
 
 (defn push-onto-rear-queue!
@@ -35,7 +35,6 @@
   to the queue."
   [width height refresh]
   (do
-    (println "generating cellular automata")
     (loop [w width h height matrix (cellularcore/init-matrix width height)]
       (push-onto-rear-queue! matrix)
       (Thread/sleep refresh)
@@ -81,7 +80,7 @@
 
 (def main-window
   "renders in a swing frame"
-   (sc/frame :title "Cellular Automatat"
+   (sc/frame :title "Cellular Automata"
              :content main-canvas))
 
 (defn create-window!
