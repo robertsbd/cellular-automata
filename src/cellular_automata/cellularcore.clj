@@ -1,26 +1,26 @@
 (ns cellular-automata.cellularcore
   (:gen-class))
 
-;; this contains the code that is 
+;; this contains the code that is responsible for operations on the cellular automata model.
 
 ;; to generate the initial values of the matrix
 
 (defn lazy-dead-alive-seq []
-  "This will generate a row of random data for initial values"
+  "Generate a lazy seq of data for initial values"
   [] (repeatedly #(if (= 0 (rand-int 2)) :dead :alive)))
 
 (defn init-matrix [w h]
-  "this will create a matrix of height by width of random number"
+  "Create a matrix of height by width of random number"
   (take h (repeatedly #(take w (lazy-dead-alive-seq)))))
 
 ;; to move the rows north, south, east, west ready to allow computing the updated value
 
 (defn move-rows-south [matrix w h]
-  "moves all the rows south, adding a row of dead cells to the top row"
+  "moves all the rows south, adding a row of dead cells to the top row w = width, h = height"
   (cons (repeat w :dead) (take (- h 1) matrix)))
 
 (defn move-rows-north [matrix w]
-  "moves all rows north, adding a row of dead cells to the bottom row"
+  "moves all rows north, adding a row of dead cells to the bottom row, w = width"
   (seq
    (conj (vec (drop 1 matrix)) (repeat w :dead))))
 
@@ -30,7 +30,7 @@
    (conj (vec (drop 1 row)) :dead)))
 
 (defn move-row-east [row w]
-  "moves a single row east, adding a dead cell to the start"
+  "[row=input row w=width] moves a single row east, adding a dead cell to the start"
   (cons :dead (take (- w 1) row)))
 
 ;; calculate the new-cell-value
@@ -47,7 +47,7 @@
 ;; calculate all the new values in a row
 
 (defn new-row-value [current n s w]
-  "runs new-cell-value across a row."
+  "runs new-cell-value across a row. We"
   (map
    #(new-cell-value %1 (list %2 %3 %4 %5 %6 %7 %8 %9))
    current

@@ -1,6 +1,8 @@
 (ns cellular-automata.cellularcore
   (:gen-class))
 
+;; this contains the code that is 
+
 ;; to generate the initial values of the matrix
 
 (defn lazy-dead-alive-seq []

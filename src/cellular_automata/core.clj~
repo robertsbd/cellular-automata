@@ -10,21 +10,20 @@
 
 (def queue (ref clojure.lang.PersistentQueue/EMPTY)) ;; this is a queue that contains the states of the cellular-automata that we are to update to
 
-(def refresh "refresh rate" 200)
-(def cols "number of cols in the display" 60)
-(def rows "number of rows in the display" 35)
-(def cell-width "width of the rows" 20)
-(def back-col "background colour" :darkgrey)
-(def dead-col "colour of dead cells" :white)
-(def alive-col "colour of alive cells" {1 :red 2 :orange 3 :yellow 4 :blue 5 :green 6 :violet})
+(def refresh 200)
+(def cols 175)
+(def rows 105)
+(def cell-width 7)
+(def dead-col :yellow)
+(def alive-col :blue)
 
 (defn push-onto-rear-queue!
-  "Push a value of the matrix onto the back of the queue"
+  "Will push a value of the matrix onto the back of the queue"
   [item]
   (dosync (alter queue conj item)))
 
 (defn pop-off-front-queue!
-  "Pop a value of the front of the queue and return it"
+  "Will pop a value of the front of the queue and return it"
   []
   (dosync
    (let [v (peek @queue)]
@@ -32,7 +31,8 @@
      v)))
 
 (defn generate-cellular-automata
-  "Generate cellular automata frames putting them onto the queue"
+  "a process that will generate cellular automata frames putting them onto the queue, control rate of animation by how fast we write
+  to the queue."
   [width height refresh]
   (do
     (loop [w width h height matrix (cellularcore/init-matrix width height)]
@@ -43,7 +43,21 @@
     )
   )
 
-;; Graphical display
+(defn render-matrix-in-console!
+  "render a matrix frame in the console"
+  [matrix]
+  (doseq [l matrix]
+    (println (map #(if (= % :dead) " " "*") l))))
+
+(defn render-in-console 
+  "a process that will pop matrices from the queue and render them in the console, will render as fast as frames are being written"
+  []
+  (while 
+      (loop []
+        (render-matrix-in-console! (pop-off-front-queue!))
+        (recur))))
+
+;; here is all the graphical information
 
 (defn n []
   (sc/native!))
@@ -57,12 +71,11 @@
       (doseq [m (map-indexed vector (second m-row))]
         (sg/draw g
                  (sg/rect (* (first m) (inc cell-width)) (* (first m-row) (inc cell-width)) cell-width cell-width)
-                 (sg/style :background (scol/color (if (= (second m) :alive) (alive-col (+ (int (* 6 (rand))) 1)) dead-col))))))))
+                 (sg/style :background (scol/color (if (= (second m) :alive) alive-col dead-col))))))))
 
 (def main-canvas
-  "The canvas"
   (sc/canvas :id :maincanvas
-          :background back-col
+          :background :white
           :paint paint-frame))
 
 (def main-window
@@ -71,35 +84,29 @@
              :content main-canvas))
 
 (defn create-window!
-  "Create a window of the given size"
   []
   (do
     (n)
     (sc/show! main-window)
-    (sc/config! main-window :size [(* cols (inc cell-width)) :by (* (inc rows) (inc cell-width))]))) ;; this doesn't quite size the window correctly
+    (sc/config! main-window :size [(* cols (inc cell-width)) :by (* rows (inc cell-width))])))
 
 (defn render-matrix-in-window!
-  "To refresh the window with updated frame"
   []
     (sc/repaint! (sc/select main-window [:#maincanvas])))
 
 (defn render-in-window
   "a process that will pop matrices from the queue and render them in a swing 
-  window, want to render as fast as frames are being written"
+  window, will render as fast as frames are being written"
   [refresh]
   (do
     (create-window!)
     (while 
         (loop []
-          (when true
-            (do
-              (Thread/sleep refresh)
-              (render-matrix-in-window!)))
+          (render-matrix-in-window!)
+          (Thread/sleep refresh)
           (recur)))))
 
-(defn -main
-  "main function"
-  [& args]
+(defn -main [& args]
   (do
     (future (generate-cellular-automata cols rows refresh))
     (future (render-in-window refresh))))
