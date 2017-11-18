@@ -45,9 +45,11 @@
   )
 
 ;; calculate all the new values in a row
+;; I think we can improve these two below with a doseq rather than a map
 
+;; these two work but I think they are inefficient
 (defn new-row-value [current n s w]
-  "runs new-cell-value across a row. We"
+  "runs new-cell-value across a row."
   (map
    #(new-cell-value %1 (list %2 %3 %4 %5 %6 %7 %8 %9))
    current
