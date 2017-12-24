@@ -1,73 +1,32 @@
 (ns cellular-automata.cellularcore
-  (:gen-class))
+  (:gen-class)
+  (:require [clojure.core.matrix :as m]))
 
-;; this contains the code that is responsible for operations on the cellular automata model.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Code responsible for operations on the data model. ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; to generate the initial values of the matrix
+(defn init-matrix
+  "Create a matrix of cols by rows of random values of 0 or 1"
+  [cols rows]
+  (m/matrix
+   (repeatedly rows #(map rand-int (repeat cols 2)))))
 
-(defn lazy-dead-alive-seq []
-  "Generate a lazy seq of data for initial values"
-  [] (repeatedly #(if (= 0 (rand-int 2)) :dead :alive)))
-
-(defn init-matrix [w h]
-  "Create a matrix of height by width of random number"
-  (take h (repeatedly #(take w (lazy-dead-alive-seq)))))
-
-;; to move the rows north, south, east, west ready to allow computing the updated value
-
-(defn move-rows-south [matrix w h]
-  "moves all the rows south, adding a row of dead cells to the top row w = width, h = height"
-  (cons (repeat w :dead) (take (- h 1) matrix)))
-
-(defn move-rows-north [matrix w]
-  "moves all rows north, adding a row of dead cells to the bottom row, w = width"
-  (seq
-   (conj (vec (drop 1 matrix)) (repeat w :dead))))
-
-(defn move-row-west [row]
-  "moves a single row west, adding a dead cell to the end"
-  (seq
-   (conj (vec (drop 1 row)) :dead)))
-
-(defn move-row-east [row w]
-  "[row=input row w=width] moves a single row east, adding a dead cell to the start"
-  (cons :dead (take (- w 1) row)))
-
-;; calculate the new-cell-value
-
-(defn new-cell-value [current-cell-val surrounding-cells]
+(defn new-cell-function
   "takes the values of the surrounding cells and returns the values of the new cells, values are 1 for alive 0 for dead"
-  (let [alive-surrounding (count (filter #(= % :alive) surrounding-cells))]
-    (cond
-      (= current-cell-val :alive) (if (or (= alive-surrounding 2) (= alive-surrounding 3)) :alive :dead)
-      (= current-cell-val :dead) (if (= alive-surrounding 3) :alive :dead))
-    )
-  )
+  [cell-val sum-surrounding]
+  (if (or (= sum-surrounding 3) (and (= sum-surrounding 2) (= cell-val 1))) 1 0))  
 
-;; calculate all the new values in a row
-;; I think we can improve these two below with a doseq rather than a map
-
-;; these two work but I think they are inefficient
-(defn new-row-value [current n s w]
-  "runs new-cell-value across a row."
-  (map
-   #(new-cell-value %1 (list %2 %3 %4 %5 %6 %7 %8 %9))
-   current
-   n
-   s
-   (move-row-east current w)
-   (move-row-west current)
-   (move-row-east n w)
-   (move-row-west n)
-   (move-row-east s w)
-   (move-row-west s)))
-
-;; calculate the new values of the matrix
-
-(defn new-matrix [matrix w h]
-  "Update the matrix to the next epoch"
-  (map
-   #(new-row-value %1 %2 %3 w)
-   matrix
-   (move-rows-north matrix w)
-   (move-rows-south matrix w h)))
+(defn updated-matrix
+  "Calculate the new values of the matrix"
+  [m]
+  (let
+      [d (m/shift m 0 -1)
+       u (m/shift m 0 1)
+       l (m/shift m 1 1)
+       r (m/shift m 1 -1)
+       dl (m/shift d 1 1)
+       dr (m/shift d 1 -1)
+       ul (m/shift u 1 1)
+       ur (m/shift u 1 -1)]
+    (m/emap #(new-cell-function %1 %2) m (m/add d u l r dl dr ul ur))))
