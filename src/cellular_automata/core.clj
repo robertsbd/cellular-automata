@@ -1,7 +1,7 @@
 (ns cellular-automata.core
   (:gen-class)
   (:require
-         [cellular-automata.cellularcore :as cellularcore]
+         [cellular-automata.datamodel :as dm]
          [seesaw.core :as sc]
          [seesaw.graphics :as sg]
          [seesaw.color :as scol]
@@ -16,7 +16,7 @@
 (def dead-col "colour of dead cells" :yellow)
 (def alive-col "colour of alive cells" :blue)
 
-(def refresh "refresh rate" 200)
+(def refresh "refresh rate" 100)
 (def screen-size "resolution of the screen" (.getScreenSize (Toolkit/getDefaultToolkit)))
 (def cell-size "length and width of cells" 5)
 
@@ -39,26 +39,22 @@
      v)))
 
 ;; Graphical display
-
 (defn paint-frame
-  "define the operation for painting the frame with an animation from 
-  from the queue"
+  "Define the operation for painting the frame with data from the queue"
   [c g]
   (let [matrix (pop-off-front-queue!)
-        matrix-as-seq (map vector (m/eseq matrix) (m/index-seq matrix))
-        alive-vals (filter (fn [[value [row col]]] (= value 1)) matrix-as-seq)]
+        matrix-as-seq (map vector (m/index-seq matrix) (m/eseq matrix))
+        alive-vals (filter (fn [[[r c] v]] (= v 1.0)) matrix-as-seq)]
     (do
-      ;; first draw the background
+      ;; draw the background
       (sg/draw g
                (sg/rect 0 0 (.width screen-size) (.height screen-size))
                (sg/style :background (scol/color dead-col)))
-               
-       ;; now draw any alive cells
-      (doseq [[value [row col]] alive-vals ]
-        (if (= value 1)
-          (sg/draw g
-                   (sg/rect (* col (inc cell-size)) (* row (inc cell-size)) cell-size cell-size)
-                   (sg/style :background (scol/color alive-col))))))))
+      ;; draw the alive cells
+      (doseq [[[r c] v] alive-vals ]
+            (sg/draw g
+                   (sg/rect (* c (inc cell-size)) (* r (inc cell-size)) cell-size cell-size)
+                   (sg/style :background (scol/color alive-col)))))))
 
 (def main-canvas
   "The canvas"
@@ -67,12 +63,12 @@
              :paint paint-frame))
 
 (def main-window
-  "create the window to render the frames in"
+  "Main window to render the frames in"
   (sc/frame :title "Cellular Automata"
             :content main-canvas))
 
 (defn create-window!
-  "Create a window of the given size"
+  "Create a full screen window"
   []
   (-> main-window
       (sc/full-screen!)
@@ -83,12 +79,12 @@
   [width height refresh]
   (do
     (create-window!)
-    (push-onto-rear-queue! (cellularcore/init-matrix cols rows))
-    (loop [m (cellularcore/updated-matrix (peek @queue))]
+    (push-onto-rear-queue! (dm/init-matrix cols rows))
+    (loop [m (dm/update-matrix (peek @queue))]
       (push-onto-rear-queue! m)
       (Thread/sleep refresh)
       (sc/repaint! (sc/select main-window [:#maincanvas]))
-      (recur (cellularcore/updated-matrix m)))))
+      (recur (dm/update-matrix m)))))
 
 (defn -main
   "main function"
